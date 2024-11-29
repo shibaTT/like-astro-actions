@@ -1,0 +1,64 @@
+---
+interface Props {
+    blogId: string
+    likes: number
+}
+
+const { blogId, likes } = Astro.props
+---
+
+<div class="like-button-wrapper flex items-center justify-center" data-blog-id={blogId}>
+    <button
+        class="like-button bg-pink-100 text-pink-500 px-4 py-2 rounded-full hover:bg-pink-200 transition-colors"
+        data-likes={likes}
+    >
+        <span class="mr-1">♥</span>
+        <span class="likes-count">{likes}</span>
+    </button>
+</div>
+
+<script>
+    import { actions } from "astro:actions"
+
+    // いいねボタンと現在のいいね数を取得するセレクター
+    const likeButton = document.querySelector<HTMLButtonElement>(".like-button")
+    const likeCount = document.querySelector<HTMLSpanElement>(".likes-count")
+
+    // いいねボタンの親要素を取得（blog IDを取得するため）
+    const likeButtonWrapper = document.querySelector<HTMLDivElement>(".like-button-wrapper")
+
+    // いいねボタンがクリックされたときのイベントリスナー
+    likeButton?.addEventListener("click", async () => {
+        // ブログIDといいね数を取得
+        const blogId = likeButtonWrapper?.dataset.blogId
+        const likes = likeButton?.dataset.likes
+
+        // ブログIDまたはいいね数が未定義の場合は処理を中断
+        if (!blogId || likes === undefined) {
+            console.error("Invalid like operation: missing blogId or likes")
+            return
+        }
+
+        // サーバー側のいいねアクションを呼び出す
+        const { data, error } = await actions.like({ blogId, likes: Number(likes) })
+
+        // エラーハンドリング
+        if (error) {
+            console.error(error)
+            return
+        }
+
+        // いいねが成功した場合、UIを更新
+        if (data.success) {
+            // ボタンのデータ属性とテキストを新しいいいね数で更新
+            if (likeButton && likeCount) {
+                const newLikes = data.likes?.toString() ?? String(likes + 1)
+                likeButton.dataset.likes = newLikes
+                likeCount.textContent = newLikes
+            }
+        } else {
+            // サーバー側のエラーをログ出力
+            console.error(data.error)
+        }
+    })
+</script>
