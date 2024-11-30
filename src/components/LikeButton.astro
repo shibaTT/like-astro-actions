@@ -31,16 +31,16 @@ const { blogId, likes } = Astro.props
     likeButton?.addEventListener("click", async () => {
         // ブログIDといいね数を取得
         const blogId = likeButtonWrapper?.dataset.blogId
-        const likes = likeButton?.dataset.likes
+        const likes = Number(likeButton?.dataset.likes)
 
         // ブログIDまたはいいね数が未定義の場合は処理を中断
-        if (!blogId || likes === undefined) {
+        if (!blogId || isNaN(likes)) {
             console.error("Invalid like operation: missing blogId or likes")
             return
         }
 
         // サーバー側のいいねアクションを呼び出す
-        const { data, error } = await actions.like({ blogId, likes: Number(likes) })
+        const { data, error } = await actions.like({ blogId, likes: likes })
 
         // エラーハンドリング
         if (error) {
@@ -52,9 +52,11 @@ const { blogId, likes } = Astro.props
         if (data.success) {
             // ボタンのデータ属性とテキストを新しいいいね数で更新
             if (likeButton && likeCount) {
-                const newLikes = data.likes?.toString() ?? String(likes + 1)
+                const newLikes = data.likes.toString()
                 likeButton.dataset.likes = newLikes
                 likeCount.textContent = newLikes
+            } else {
+                console.error("Invalid like operation: missing likeButton or likeCount")
             }
         } else {
             // サーバー側のエラーをログ出力
