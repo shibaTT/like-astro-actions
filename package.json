@@ -12,6 +12,7 @@
         "format": "prettier --write '**/*.{ts,tsx,astro,js,jsx,json,md,yml,yaml}'"
     },
     "dependencies": {
+        "@astrojs/netlify": "^5.5.4",
         "@astrojs/tailwind": "^5.1.0",
         "@tailwindcss/typography": "^0.5.10",
         "@types/node": "^20.11.30",
