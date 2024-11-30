@@ -28,7 +28,7 @@ const blog = await getBlogDetail(id!)
                 <time datetime={blog.publishedAt}>
                     {blog.publishedAt ? formatDate(blog.publishedAt) : ""}
                 </time>
-                <LikeButton blogId={blog.id} likes={blog.likes} />
+                <LikeButton blogId={blog.id} />
             </div>
             <div class="prose max-w-none" set:html={blog.content} />
         </div>

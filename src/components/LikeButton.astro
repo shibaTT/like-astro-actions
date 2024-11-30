@@ -1,10 +1,9 @@
 ---
 interface Props {
     blogId: string
-    likes: number
 }
 
-const { blogId, likes } = Astro.props
+const { blogId } = Astro.props
 ---
 
 <div class="like-button-wrapper flex items-center justify-center" data-blog-id={blogId}>
@@ -12,7 +11,7 @@ const { blogId, likes } = Astro.props
         class="like-button flex items-center justify-center bg-pink-100 text-pink-500 px-4 py-2 rounded-full hover:bg-pink-200 transition-colors"
     >
         <span class="inline-block mr-1">♥</span>
-        <span class="inline-block like-count w-5 h-5 -mt-1.5 transition-all">{likes}</span>
+        <span class="inline-block like-count w-5 h-5 -mt-1.5 transition-all"></span>
     </button>
 </div>
 
@@ -26,25 +25,65 @@ const { blogId, likes } = Astro.props
     // いいねボタンの親要素を取得（blog IDを取得するため）
     const likeButtonWrapper = document.querySelector<HTMLDivElement>(".like-button-wrapper")
 
+    // ブログIDを取得
+    const blogId = likeButtonWrapper?.dataset.blogId
+
     // アニメーション用クラス
     const classes = [
         "animate-spin",
         "border-2",
-        "border-blue-500",
+        "border-pink-500",
         "rounded-full",
         "border-t-transparent",
         "text-transparent",
         "mt-0",
     ]
 
-    // いいねボタンがクリックされたときのイベントリスナー
-    likeButton?.addEventListener("click", async () => {
+    async function getLikes(blogId: string): Promise<number | undefined> {
+        // サーバー側のいいね数取得アクションを呼び出す
+        const { data: getLikesResponse, error: getLikesError } = await actions.getLikes({ blogId })
+
+        // 取得に失敗した場合は処理を中断
+        if (getLikesError || (getLikesResponse && !getLikesResponse.success)) {
+            console.error("Invalid like operation: missing likes")
+            return
+        }
+
+        return getLikesResponse.likes
+    }
+
+    async function setLikes(blogId: string, likes: number): Promise<number | undefined> {
+        // サーバー側のいいねアクションを呼び出す
+        const { data: likeResponse, error: likeResponseError } = await actions.like({
+            blogId,
+            likes,
+        })
+
+        // エラーハンドリング
+        if (likeResponseError) {
+            console.error(likeResponseError)
+            return
+        }
+        if (!likeResponse.success) {
+            console.error("Invalid like operation: missing likes")
+            return
+        }
+
+        return likeResponse.likes + 1
+    }
+
+    function updateLikeCountElement(likeCount: HTMLSpanElement | null, likes: number | string) {
+        if (likeCount) {
+            likeCount.textContent = likes.toString()
+        } else {
+            console.error("Invalid like operation: missing likeCount")
+        }
+    }
+
+    async function handleClickLikeButton(likeCount: HTMLSpanElement | null, blogId: string | undefined) {
         try {
             // アニメーション用クラスの付与
             likeCount?.classList.add(...classes)
-
-            // ブログIDを取得
-            const blogId = likeButtonWrapper?.dataset.blogId
 
             // ブログIDが未定義の場合は処理を中断
             if (!blogId) {
@@ -52,43 +91,31 @@ const { blogId, likes } = Astro.props
                 return
             }
 
-            // サーバー側のいいね数取得アクションを呼び出す
-            const { data: getLikesResponse, error: getLikesError } = await actions.getLikes({ blogId })
+            // いいね数の取得
+            const likes = await getLikes(blogId)
 
-            // 取得に失敗した場合は処理を中断
-            if (getLikesError || (getLikesResponse && !getLikesResponse.success)) {
-                console.error("Invalid like operation: missing likes")
-                return
-            }
+            // 取得できなければ処理を中断
+            if (!likes) return
 
             // サーバー側のいいねアクションを呼び出す
-            const { data: likeResponse, error: likeResponseError } = await actions.like({
-                blogId,
-                likes: getLikesResponse.likes,
-            })
+            const newLikes = await setLikes(blogId, likes)
 
             // エラーハンドリング
-            if (likeResponseError) {
-                console.error(likeResponseError)
-                return
-            }
+            if (!newLikes) return
 
-            // いいねが成功した場合、UIを更新
-            if (likeResponse.success) {
-                // ボタンのデータ属性とテキストを新しいいいね数で更新
-                if (likeButton && likeCount) {
-                    const newLikes = likeResponse.likes.toString()
-                    likeCount.textContent = newLikes
-                } else {
-                    console.error("Invalid like operation: missing likeButton or likeCount")
-                }
-            } else {
-                // サーバー側のエラーをログ出力
-                console.error(likeResponse.error)
-            }
+            // ボタンのデータ属性とテキストを新しいいいね数で更新
+            updateLikeCountElement(likeCount, newLikes)
         } finally {
             // アニメーション用クラスの削除
             likeCount?.classList.remove(...classes)
         }
-    })
+    }
+
+    // いいねボタンがクリックされたときのイベントリスナー
+    likeButton?.addEventListener("click", async () => await handleClickLikeButton(likeCount, blogId))
+
+    if (blogId) {
+        const _likes = await getLikes(blogId)
+        _likes && updateLikeCountElement(likeCount, _likes)
+    }
 </script>
