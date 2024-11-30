@@ -52,6 +52,7 @@ const { blogId, likes } = Astro.props
                 return
             }
 
+            // サーバー側のいいね数取得アクションを呼び出す
             const { data: getLikesResponse, error: getLikesError } = await actions.getLikes({ blogId })
 
             // 取得に失敗した場合は処理を中断
