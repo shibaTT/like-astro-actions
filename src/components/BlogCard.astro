@@ -20,10 +20,6 @@ const { blog } = Astro.props
                 <time datetime={blog.publishedAt}>
                     {blog.publishedAt ? formatDate(blog.publishedAt) : ""}
                 </time>
-                <div class="flex items-center">
-                    <span class="mr-1">♥</span>
-                    <span>{blog.likes}</span>
-                </div>
             </div>
         </div>
     </a>

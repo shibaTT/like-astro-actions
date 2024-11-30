@@ -8,10 +8,7 @@ const { blogId, likes } = Astro.props
 ---
 
 <div class="like-button-wrapper flex items-center justify-center" data-blog-id={blogId}>
-    <button
-        class="like-button bg-pink-100 text-pink-500 px-4 py-2 rounded-full hover:bg-pink-200 transition-colors"
-        data-likes={likes}
-    >
+    <button class="like-button bg-pink-100 text-pink-500 px-4 py-2 rounded-full hover:bg-pink-200 transition-colors">
         <span class="mr-1">♥</span>
         <span class="likes-count">{likes}</span>
     </button>
@@ -29,38 +26,47 @@ const { blogId, likes } = Astro.props
 
     // いいねボタンがクリックされたときのイベントリスナー
     likeButton?.addEventListener("click", async () => {
-        // ブログIDといいね数を取得
+        // ブログIDを取得
         const blogId = likeButtonWrapper?.dataset.blogId
-        const likes = Number(likeButton?.dataset.likes)
 
-        // ブログIDまたはいいね数が未定義の場合は処理を中断
-        if (!blogId || isNaN(likes)) {
-            console.error("Invalid like operation: missing blogId or likes")
+        // ブログIDが未定義の場合は処理を中断
+        if (!blogId) {
+            console.error("Invalid like operation: missing blogId")
+            return
+        }
+
+        const { data: getLikesResponse, error: getLikesError } = await actions.getLikes({ blogId })
+
+        // 取得に失敗した場合は処理を中断
+        if (getLikesError || (getLikesResponse && !getLikesResponse.success)) {
+            console.error("Invalid like operation: missing likes")
             return
         }
 
         // サーバー側のいいねアクションを呼び出す
-        const { data, error } = await actions.like({ blogId, likes: likes })
+        const { data: likeResponse, error: likeResponseError } = await actions.like({
+            blogId,
+            likes: getLikesResponse.likes,
+        })
 
         // エラーハンドリング
-        if (error) {
-            console.error(error)
+        if (likeResponseError) {
+            console.error(likeResponseError)
             return
         }
 
         // いいねが成功した場合、UIを更新
-        if (data.success) {
+        if (likeResponse.success) {
             // ボタンのデータ属性とテキストを新しいいいね数で更新
             if (likeButton && likeCount) {
-                const newLikes = data.likes.toString()
-                likeButton.dataset.likes = newLikes
+                const newLikes = likeResponse.likes.toString()
                 likeCount.textContent = newLikes
             } else {
                 console.error("Invalid like operation: missing likeButton or likeCount")
             }
         } else {
             // サーバー側のエラーをログ出力
-            console.error(data.error)
+            console.error(likeResponse.error)
         }
     })
 </script>
