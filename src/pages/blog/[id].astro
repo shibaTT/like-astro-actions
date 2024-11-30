@@ -1,8 +1,20 @@
 ---
+import type { GetStaticPaths } from "astro"
 import Layout from "../../layouts/Layout.astro"
 import LikeButton from "../../components/LikeButton.astro"
-import { getBlogDetail } from "../../lib/microcms"
+import { getBlogs, getBlogDetail } from "../../lib/microcms"
 import { formatDate } from "../../utils/date"
+
+export const getStaticPaths = async () => {
+    const blogs = await getBlogs()
+    for (const blog of blogs.contents) {
+        return [
+            {
+                params: { id: blog.id },
+            },
+        ]
+    }
+}
 
 const { id } = Astro.params
 const blog = await getBlogDetail(id!)
