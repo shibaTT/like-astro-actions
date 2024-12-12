@@ -18,17 +18,7 @@ const { blogId } = Astro.props
 <script>
     import { actions } from "astro:actions"
 
-    // いいねボタンと現在のいいね数のエレメントを取得するセレクター
-    const likeButton = document.querySelector<HTMLButtonElement>(".like-button")
-    const likeCount = document.querySelector<HTMLSpanElement>(".like-count")
-
-    // いいねボタンの親要素を取得（blog IDを取得するため）
-    const likeButtonWrapper = document.querySelector<HTMLDivElement>(".like-button-wrapper")
-
-    // ブログIDを取得
-    const blogId = likeButtonWrapper?.dataset.blogId
-
-    // アニメーション用クラス
+    // アニメーション用クラス名
     const classes = [
         "animate-spin",
         "border-2",
@@ -39,83 +29,100 @@ const { blogId } = Astro.props
         "mt-0",
     ]
 
-    async function getLikes(blogId: string): Promise<number | undefined> {
-        // サーバー側のいいね数取得アクションを呼び出す
-        const { data: getLikesResponse, error: getLikesError } = await actions.getLikes({ blogId })
+    // いいねボタンの制御を行うクラス
+    class LikeButtonController {
+        // DOM要素の参照を保持
+        private likeButton: HTMLButtonElement | null
+        private likeCount: HTMLSpanElement | null
+        private blogId: string | undefined
 
-        // 取得に失敗した場合は処理を中断
-        if (getLikesError || (getLikesResponse && !getLikesResponse.success)) {
-            console.error("Invalid like operation: missing likes")
-            return
+        // コンストラクタ - DOM要素の取得と初期化
+        constructor() {
+            this.likeButton = document.querySelector<HTMLButtonElement>(".like-button")
+            this.likeCount = document.querySelector<HTMLSpanElement>(".like-count")
+            this.blogId = document.querySelector<HTMLDivElement>(".like-button-wrapper")?.dataset.blogId
+
+            this.initialize()
         }
 
-        return getLikesResponse.likes
-    }
-
-    async function setLikes(blogId: string, likes: number): Promise<number | undefined> {
-        // サーバー側のいいねアクションを呼び出す
-        const { data: likeResponse, error: likeResponseError } = await actions.like({
-            blogId,
-            likes,
-        })
-
-        // エラーハンドリング
-        if (likeResponseError) {
-            console.error(likeResponseError)
-            return
-        }
-        if (!likeResponse.success) {
-            console.error("Invalid like operation: missing likes")
-            return
+        // 初期いいね数の取得と表示
+        private async initialize() {
+            if (!this.blogId) return
+            const likes = await this.getLikes()
+            if (likes !== undefined) {
+                this.updateLikeCount(likes)
+            }
         }
 
-        return likeResponse.likes + 1
-    }
+        // APIからいいね数を取得
+        private async getLikes(): Promise<number | undefined> {
+            if (!this.blogId) return
 
-    function updateLikeCountElement(likeCount: HTMLSpanElement | null, likes: number | string) {
-        if (likeCount) {
-            likeCount.textContent = likes.toString()
-        } else {
-            console.error("Invalid like operation: missing likeCount")
-        }
-    }
+            const { data, error } = await actions.getLikes({ blogId: this.blogId })
 
-    async function handleClickLikeButton(likeCount: HTMLSpanElement | null, blogId: string | undefined) {
-        try {
-            // アニメーション用クラスの付与
-            likeCount?.classList.add(...classes)
-
-            // ブログIDが未定義の場合は処理を中断
-            if (!blogId) {
-                console.error("Invalid like operation: missing blogId")
+            if (error || (data && !data.success)) {
+                console.error("いいね数の取得に失敗しました")
                 return
             }
 
-            // いいね数の取得
-            const likes = await getLikes(blogId)
+            return data.likes
+        }
 
-            // 取得できなければ処理を中断
-            if (!likes) return
+        // Actionsでいいね数を更新
+        private async setLikes(currentLikes: number): Promise<number | undefined> {
+            if (!this.blogId) return
 
-            // サーバー側のいいねアクションを呼び出す
-            const newLikes = await setLikes(blogId, likes)
+            const { data, error } = await actions.like({
+                blogId: this.blogId,
+                likes: currentLikes,
+            })
 
-            // エラーハンドリング
-            if (!newLikes) return
+            if (error || !data.success) {
+                console.error("いいねの更新に失敗しました")
+                return
+            }
 
-            // ボタンのデータ属性とテキストを新しいいいね数で更新
-            updateLikeCountElement(likeCount, newLikes)
-        } finally {
-            // アニメーション用クラスの削除
-            likeCount?.classList.remove(...classes)
+            return data.likes
+        }
+
+        // いいね数の表示を更新
+        private updateLikeCount(likes: number) {
+            if (this.likeCount) {
+                this.likeCount.textContent = likes.toString()
+            }
+        }
+
+        // いいねボタンクリック時の処理
+        private handleClick = async () => {
+            if (!this.likeCount || !this.blogId) return
+
+            try {
+                // ローディングアニメーションの開始
+                this.likeCount.classList.add(...classes)
+
+                // 現在のいいね数を取得
+                const currentLikes = await this.getLikes()
+                if (currentLikes === undefined) return
+
+                // いいね数を更新
+                const newLikes = await this.setLikes(currentLikes)
+                if (newLikes === undefined) return
+
+                // 表示を更新
+                this.updateLikeCount(newLikes)
+            } finally {
+                // ローディングアニメーションの終了
+                this.likeCount.classList.remove(...classes)
+            }
+        }
+
+        // イベントリスナーの設定
+        public setupEventListeners() {
+            this.likeButton?.addEventListener("click", this.handleClick)
         }
     }
 
-    // いいねボタンがクリックされたときのイベントリスナー
-    likeButton?.addEventListener("click", async () => await handleClickLikeButton(likeCount, blogId))
-
-    if (blogId) {
-        const _likes = await getLikes(blogId)
-        _likes && updateLikeCountElement(likeCount, _likes)
-    }
+    // コントローラーのインスタンスを作成し、イベントリスナーを設定
+    const controller = new LikeButtonController()
+    controller.setupEventListeners()
 </script>
